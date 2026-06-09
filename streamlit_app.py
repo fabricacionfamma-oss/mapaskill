@@ -181,7 +181,7 @@ elif menu == "📅 Armador de Turnos":
     with col_seleccion:
         st.markdown("### 1. Seleccionar Área y Puesto")
         turno_t = st.selectbox("Turno:", ["A (Mañana)", "B (Tarde)", "C (Noche)"])
-        puesto_t = st.selectbox("Máquina a cubrir:", puestos_ordenados) [cite: 79-92]
+        puesto_t = st.selectbox("Máquina a cubrir:", puestos_ordenados) 
         
         df_puesto = df_base[df_base["Máquina"] == puesto_t]
         
