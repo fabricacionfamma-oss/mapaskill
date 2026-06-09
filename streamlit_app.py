@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import io
 
 # --- 1. CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Gestor FUMISCOR", layout="wide", page_icon="🏭")
@@ -15,105 +16,118 @@ menu = st.sidebar.radio(
 
 # --- 3. PANTALLA: MAPA SKILL GLOBAL ---
 if menu == "📊 Mapa Skill Global":
-    st.title("📊 Mapa Skill Dinámico")
-    st.markdown("Visualización de la polivalencia y estado de los operarios.")
+    st.title("📊 Mapa Skill General")
+    st.markdown("Visualización de la polivalencia (Niveles 1 al 4) y estado de los operarios.")
     
-    # SIMULACIÓN DE DATOS DE ENTRADA (Luego vendrán de Sheets y SQL Wiidem)
-    datos_skills = pd.DataFrame({
-        "Operario": ["Juan Pérez", "Juan Pérez", "Ana Gómez", "Ana Gómez"],
-        "Máquina": ["Prensa A", "Inyectora B", "Prensa A", "Inyectora B"],
-        "Puntaje": [85, 20, 60, 90]
-    })
-
+    # SIMULACIÓN DE DATOS AMPLIADA (Basado en Estructura Famma)
     hoy = datetime.now()
-    datos_actividad = pd.DataFrame({
-        "Operario": ["Juan Pérez", "Juan Pérez", "Ana Gómez", "Ana Gómez"],
-        "Máquina": ["Prensa A", "Inyectora B", "Prensa A", "Inyectora B"],
-        # Simulamos que Juan hace 70 días no usa la Prensa A (debería bloquearse)
-        "Ultimo_Logueo": [hoy - timedelta(days=70), hoy - timedelta(days=5), hoy - timedelta(days=10), hoy - timedelta(days=2)]
-    })
+    
+    # Generamos una base de datos de prueba robusta para la grilla
+    datos_prueba = [
+        # Famma Estampado: Línea 2, Línea 3, Línea 4
+        {"Operario": "Juan Pérez", "Máquina": "Línea 2", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=5)},
+        {"Operario": "Juan Pérez", "Máquina": "Línea 3", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=70)}, # Bloqueado
+        {"Operario": "Ana Gómez", "Máquina": "Línea 2", "Puntaje": 45, "Ultimo_Logueo": hoy - timedelta(days=12)},
+        {"Operario": "Ana Gómez", "Máquina": "Línea 4", "Puntaje": 70, "Ultimo_Logueo": hoy - timedelta(days=2)},
+        {"Operario": "Carlos Ruiz", "Máquina": "Línea 3", "Puntaje": 20, "Ultimo_Logueo": hoy - timedelta(days=1)},
+        {"Operario": "Carlos Ruiz", "Máquina": "Línea 4", "Puntaje": 95, "Ultimo_Logueo": hoy - timedelta(days=15)},
+        
+        # Famma Soldadura: Celdas Robotizadas, MIG, PRP
+        {"Operario": "María López", "Máquina": "Celdas Robotizadas", "Puntaje": 90, "Ultimo_Logueo": hoy - timedelta(days=10)},
+        {"Operario": "María López", "Máquina": "MIG", "Puntaje": 60, "Ultimo_Logueo": hoy - timedelta(days=5)},
+        {"Operario": "Diego Torres", "Máquina": "PRP", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=80)}, # Bloqueado
+        {"Operario": "Diego Torres", "Máquina": "Celdas Robotizadas", "Puntaje": 15, "Ultimo_Logueo": hoy - timedelta(days=2)},
+        {"Operario": "Laura Silva", "Máquina": "MIG", "Puntaje": 80, "Ultimo_Logueo": hoy - timedelta(days=20)},
+        {"Operario": "Laura Silva", "Máquina": "PRP", "Puntaje": 55, "Ultimo_Logueo": hoy - timedelta(days=10)}
+    ]
+    
+    df_cruzado = pd.DataFrame(datos_prueba)
 
-    # LÓGICA DE NEGOCIO Y CRUCE DE DATOS
-    df_cruzado = pd.merge(datos_skills, datos_actividad, on=["Operario", "Máquina"])
-
+    # LÓGICA DE NEGOCIO: Progresión de niveles y regla de 60 días
     def calcular_estado(fila):
         dias_inactivo = (hoy - fila["Ultimo_Logueo"]).days
         puntaje = fila["Puntaje"]
         
-        # Regla 1: Bloqueo por inactividad (> 60 días)
         if dias_inactivo > 60:
             return "🔒 Bloqueado (>2 meses)"
         
-        # Regla 2: Asignación de nivel por cuartiles
         if puntaje <= 25:
-            return "N1: Entrenamiento (0-25%)"
+            return "N1: Entrenamiento"
         elif puntaje <= 50:
-            return "N2: Básico (26-50%)"
+            return "N2: Básico"
         elif puntaje <= 75:
-            return "N3: Autónomo (51-75%)"
+            return "N3: Autónomo"
         else:
-            return "N4: Experto (76-100%)"
+            return "N4: Experto"
 
     df_cruzado["Estado_Final"] = df_cruzado.apply(calcular_estado, axis=1)
 
-    # Transformamos a Matriz (Filas = Operarios, Columnas = Máquinas)
+    # TRANSFORMACIÓN A GRILLA (Matriz Excel-like)
     mapa_skill_matriz = df_cruzado.pivot(index="Operario", columns="Máquina", values="Estado_Final")
+    
+    # Ordenar las columnas para agrupar Estampado y Soldadura
+    columnas_ordenadas = ["Línea 2", "Línea 3", "Línea 4", "Celdas Robotizadas", "MIG", "PRP"]
+    # Solo mostramos las columnas que existen en los datos
+    columnas_presentes = [col for col in columnas_ordenadas if col in mapa_skill_matriz.columns]
+    mapa_skill_matriz = mapa_skill_matriz[columnas_presentes]
 
     # VISUALIZACIÓN Y COLORES EN STREAMLIT
     def colorear_celdas(valor):
         if pd.isna(valor):
-            return 'background-color: white'
+            return 'background-color: #f8fafc; color: #cbd5e1' # Celda vacía gris claro
         elif 'Bloqueado' in str(valor):
-            return 'background-color: #ffcccc; color: #990000; font-weight: bold' # Rojo
+            return 'background-color: #fca5a5; color: #990000; font-weight: bold' # Rojo
         elif 'N1' in str(valor):
-            return 'background-color: #ffe6cc' # Naranja claro
+            return 'background-color: #fed7aa; color: #822c0a' # Naranja
         elif 'N2' in str(valor):
-            return 'background-color: #ffffcc' # Amarillo
+            return 'background-color: #fef08a; color: #854d0e' # Amarillo
         elif 'N3' in str(valor):
-            return 'background-color: #cceeff' # Celeste
+            return 'background-color: #bae6fd; color: #075985' # Celeste
         elif 'N4' in str(valor):
-            return 'background-color: #ccffcc; font-weight: bold' # Verde
+            return 'background-color: #bbf7d0; color: #166534; font-weight: bold' # Verde
         return ''
 
     st.markdown("### Matriz de Polivalencia Actualizada")
     
-    # * CORRECCIÓN AQUÍ: Se utiliza .map() en lugar de .applymap() para Pandas >= 2.1.0 *
-    st.dataframe(mapa_skill_matriz.style.map(colorear_celdas), use_container_width=True)
+    # Mostramos la grilla utilizando toda el ancho de la pantalla
+    st.dataframe(mapa_skill_matriz.style.map(colorear_celdas), use_container_width=True, height=300)
+    
+    # EXPORTACIÓN NATIVA A EXCEL
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        mapa_skill_matriz.to_excel(writer, sheet_name='Mapa Skill')
     
     st.download_button(
-        label="📥 Exportar Mapa Skill a CSV",
-        data=mapa_skill_matriz.to_csv().encode('utf-8'),
-        file_name='Mapa_Skill_Fumiscor.csv',
-        mime='text/csv'
+        label="📥 Exportar Grilla a Excel (.xlsx)",
+        data=buffer.getvalue(),
+        file_name='Mapa_Skill_Fumiscor_Export.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
 # --- 4. PANTALLA: RESUMEN EVALUACIONES ---
 elif menu == "📝 Resumen Evaluaciones":
     st.title("📝 Resumen de Evaluaciones por Usuario")
-    
-    operario_buscado = st.selectbox("Seleccione un Operario:", ["Juan Pérez", "Ana Gómez", "Carlos Ruiz"])
+    operario_buscado = st.selectbox("Seleccione un Operario:", ["Juan Pérez", "Ana Gómez", "Carlos Ruiz", "María López", "Diego Torres", "Laura Silva"])
     
     col1, col2 = st.columns(2)
     with col1:
-        st.metric(label="Última Evaluación", value="Prensa A", delta="75%")
+        st.metric(label="Última Evaluación", value="Línea 2", delta="75%")
     with col2:
-        st.metric(label="Estado de Actividad", value="Activo", delta="Último logueo: Ayer")
+        st.metric(label="Estado de Actividad", value="Activo", delta="Último logueo: Hace 5 días")
         
-    st.info("Aquí se mostrará el historial detallado del operario extraído de Google Forms.")
+    st.info("Aquí se mostrará el historial detallado extraído de Google Forms.")
 
 # --- 5. PANTALLA: ARMADOR DE TURNOS ---
 elif menu == "📅 Armador de Turnos":
     st.title("📅 Armador de Turnos Seguro")
-    st.warning("Solo se mostrarán operarios aptos y con actividad reciente (Regla de 60 días).")
+    st.warning("El sistema valida Nivel de Skill y Fecha de último logueo.")
     
     col_maq, col_turno = st.columns(2)
     with col_maq:
-        maquina = st.selectbox("Seleccionar Máquina:", ["Prensa A", "Inyectora B"])
+        maquina = st.selectbox("Seleccionar Puesto:", ["Línea 2", "Línea 3", "Línea 4", "Celdas Robotizadas", "MIG", "PRP"])
     with col_turno:
         turno = st.selectbox("Seleccionar Turno:", ["A (Mañana)", "B (Tarde)", "C (Noche)"]) 
         
-    st.success(f"Operarios disponibles para {maquina} en Turno {turno}:")
-    
-    # Checks simulados (luego se filtrarán automáticamente con la lógica cruzada)
-    st.checkbox("Juan Pérez (Nivel: Experto)")
-    st.checkbox("Ana Gómez (Nivel: Autónoma)")
+    st.success(f"Operarios Calificados para {maquina} en Turno {turno}:")
+    st.checkbox("María López (N4: Experto)")
+    st.checkbox("Ana Gómez (N3: Autónomo)")
