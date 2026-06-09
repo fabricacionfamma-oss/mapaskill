@@ -41,32 +41,32 @@ st.markdown("""
 if 'roster_planta' not in st.session_state:
     st.session_state.roster_planta = {}
 
-# --- 2. BASE DE DATOS UNIFICADA (Mapeo de Áreas y Logueos Wiidem) ---
+# --- 2. BASE DE DATOS UNIFICADA (Simulación de Forms + Wiidem) ---
 hoy = datetime.now()
 datos_fabrica = [
     # Famma Estampado
     {"Legajo": "1001", "Operario": "Juan Pérez", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 25, "Ultimo_Logueo": hoy - timedelta(days=5)},
-    {"Legajo": "1001", "Operario": "Juan Pérez", "Área": "Famma Estampado", "Máquina": "Línea 3", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=72)}, # Bloqueado
+    {"Legajo": "1001", "Operario": "Juan Pérez", "Área": "Famma Estampado", "Máquina": "Línea 3", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=72)}, 
     {"Legajo": "1001", "Operario": "Juan Pérez", "Área": "Famma Estampado", "Máquina": "Línea 4", "Puntaje": 60, "Ultimo_Logueo": hoy - timedelta(days=10)},
     {"Legajo": "1002", "Operario": "Ana Gómez", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 55, "Ultimo_Logueo": hoy - timedelta(days=12)},
     {"Legajo": "1002", "Operario": "Ana Gómez", "Área": "Famma Estampado", "Máquina": "Línea 4", "Puntaje": 90, "Ultimo_Logueo": hoy - timedelta(days=2)},
     {"Legajo": "1003", "Operario": "Carlos Ruiz", "Área": "Famma Estampado", "Máquina": "Línea 3", "Puntaje": 20, "Ultimo_Logueo": hoy - timedelta(days=1)},
     {"Legajo": "1006", "Operario": "Gabriel Méndez", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 80, "Ultimo_Logueo": hoy - timedelta(days=4)},
     {"Legajo": "1008", "Operario": "Cristian Ortega", "Área": "Famma Estampado", "Máquina": "Línea 4", "Puntaje": 70, "Ultimo_Logueo": hoy - timedelta(days=6)},
-    {"Legajo": "1010", "Operario": "Lucas Herrera", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=90)}, # Bloqueado
+    {"Legajo": "1010", "Operario": "Lucas Herrera", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=90)}, 
     
     # Famma Soldadura
     {"Legajo": "1002", "Operario": "Ana Gómez", "Área": "Famma Soldadura", "Máquina": "MIG", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=4)},
-    {"Legajo": "1003", "Operario": "Carlos Ruiz", "Área": "Famma Soldadura", "Máquina": "PRP", "Puntaje": 40, "Ultimo_Logueo": hoy - timedelta(days=80)}, # Bloqueado
+    {"Legajo": "1003", "Operario": "Carlos Ruiz", "Área": "Famma Soldadura", "Máquina": "PRP", "Puntaje": 40, "Ultimo_Logueo": hoy - timedelta(days=80)}, 
     {"Legajo": "1004", "Operario": "María López", "Área": "Famma Soldadura", "Máquina": "Celdas Robot", "Puntaje": 95, "Ultimo_Logueo": hoy - timedelta(days=3)},
     {"Legajo": "1004", "Operario": "María López", "Área": "Famma Soldadura", "Máquina": "MIG", "Puntaje": 75, "Ultimo_Logueo": hoy - timedelta(days=8)},
-    {"Legajo": "1005", "Operario": "Diego Torres", "Área": "Famma Soldadura", "Máquina": "PRP", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=65)}, # Bloqueado
+    {"Legajo": "1005", "Operario": "Diego Torres", "Área": "Famma Soldadura", "Máquina": "PRP", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=65)}, 
     {"Legajo": "1005", "Operario": "Diego Torres", "Área": "Famma Soldadura", "Máquina": "Celdas Robot", "Puntaje": 15, "Ultimo_Logueo": hoy - timedelta(days=2)},
     {"Legajo": "1007", "Operario": "Sofia Rodríguez", "Área": "Famma Soldadura", "Máquina": "Celdas Robot", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=1)},
     {"Legajo": "1009", "Operario": "Valeria Russo", "Área": "Famma Soldadura", "Máquina": "PRP", "Puntaje": 80, "Ultimo_Logueo": hoy - timedelta(days=2)}
 ]
 
-# Rellenado para simulación de panel masivo congelado
+# Rellenado para simulación de panel masivo congelado (+100 usuarios)
 for i in range(11, 35):
     datos_fabrica.append({"Legajo": str(1000+i), "Operario": f"Operario Prueba {i}", "Área": "Famma Estampado", "Máquina": "Línea 2", "Puntaje": 75, "Ultimo_Logueo": hoy - timedelta(days=15)})
 
@@ -85,8 +85,8 @@ def analizar_competencia(fila):
 df_base[['Nivel', 'Bloqueado', 'Dias_Inactivo']] = df_base.apply(lambda r: pd.Series(analizar_competencia(r)), axis=1)
 
 # Jerarquías oficiales por área
-puestos_estampado = ["Línea 2", "Línea 3", "Línea 4"] [cite: 79, 82, 84]
-puestos_soldadura = ["Celdas Robot", "MIG", "PRP"] [cite: 86, 89, 91]
+puestos_estampado = ["Línea 2", "Línea 3", "Línea 4"]
+puestos_soldadura = ["Celdas Robot", "MIG", "PRP"]
 puestos_ordenados = puestos_estampado + puestos_soldadura
 
 # --- 4. BARRA LATERAL Y EXPORTACIÓN MAESTRA ---
@@ -117,7 +117,8 @@ st.sidebar.download_button(
     label="📄 Exportar Grilla de Actualización",
     data=exportar_matriz_actualizacion(),
     file_name='Actualizacion_Mapa_Skill.xlsx',
-    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    help="Descarga la matriz con los puntajes para copiar y pegar directamente en tu Excel maestro."
 )
 
 # --- PANTALLA 1: MAPA SKILL GLOBAL ---
@@ -127,11 +128,11 @@ if menu == "📊 Mapa Skill Global":
     
     col_f1, col_f2 = st.columns(2)
     with col_f1: busqueda_nombre = st.text_input("🔍 Buscar por Nombre o Legajo:")
-    with col_f2: area_filtro = st.multiselect("🏭 Filtrar por Área:", ["Famma Estampado", "Famma Soldadura"], default=["Famma Estampado", "Famma Soldadura"]) [cite: 81, 88]
+    with col_f2: area_filtro = st.multiselect("🏭 Filtrar por Área:", ["Famma Estampado", "Famma Soldadura"], default=["Famma Estampado", "Famma Soldadura"])
     
     puestos_filtrados = []
-    if "Famma Estampado" in area_filtro: puestos_filtrados.extend(puestos_estampado) [cite: 81]
-    if "Famma Soldadura" in area_filtro: puestos_filtrados.extend(puestos_soldadura) [cite: 88]
+    if "Famma Estampado" in area_filtro: puestos_filtrados.extend(puestos_estampado)
+    if "Famma Soldadura" in area_filtro: puestos_filtrados.extend(puestos_soldadura)
 
     def renderizar_html_grid(nivel, bloqueado):
         if bloqueado: return '<div style="color:#ef4444; font-weight:bold; font-size:22px; text-align:center;">🔒</div>'
@@ -152,20 +153,17 @@ if menu == "📊 Mapa Skill Global":
 # --- PANTALLA 2: RESUMEN EVALUACIONES (LEGAJO DIGITAL WIIDEM) ---
 elif menu == "📝 Resumen Evaluaciones":
     st.title("📝 Legajo Digital de Operarios")
-    st.markdown("Consolidado analítico de Evaluaciones Técnicas (Forms) e Historial de Servidores (Wiidem)[cite: 44, 70].")
+    st.markdown("Consolidado analítico de Evaluaciones Técnicas (Forms) e Historial de Servidores (Wiidem).")
     
     op_seleccionado = st.selectbox("Seleccione el Operario a auditar:", df_base["Operario"].unique())
     df_op = df_base[df_base["Operario"] == op_seleccionado]
     
     st.markdown(f"### **Colaborador:** {op_seleccionado} | **Legajo:** {df_op['Legajo'].iloc[0]}")
     
-    # KPIs Rápidos de Auditoría
     kpi1, kpi2, kpi3 = st.columns(3)
     kpi1.metric("Puestos Calificados (Nivel >= 3)", len(df_op[df_op["Nivel"] >= 3]))
     kpi2.metric("Bloqueos por Inactividad (>60 días)", len(df_op[df_op["Bloqueado"] == True]))
-    
-    # Simulación de estado de red/servidor para la demo
-    kpi3.metric("Conexión del Legajo", "Servidor FUMIS (OK)", delta="Base wii_bi") [cite: 3, 5]
+    kpi3.metric("Conexión del Legajo", "Servidor FUMIS (OK)", delta="Base wii_bi")
     
     st.markdown("---")
     st.markdown("#### Resumen Cruzado: Habilidad vs Último Login")
@@ -173,7 +171,7 @@ elif menu == "📝 Resumen Evaluaciones":
     df_historial = df_op.copy()
     df_historial["Estado Certificación"] = df_historial.apply(lambda r: "⭐ Experto" if r["Nivel"] == 4 else ("✅ Autónomo" if r["Nivel"] == 3 else ("⚠️ Básico" if r["Nivel"] == 2 else "🌱 Entrenamiento")), axis=1)
     df_historial["Último Login Realizado"] = df_historial["Ultimo_Logueo"].dt.strftime('%d/%m/%Y') + df_historial["Dias_Inactivo"].apply(lambda d: f" (Hace {d} días)")
-    df_historial["Habilitación Planta"] = df_historial["Bloqueado"].apply(lambda b: "❌ BLOQUEADO - Requiere Reinducción" if b else "🟢 HABILITADO") [cite: 74, 98]
+    df_historial["Habilitación Planta"] = df_historial["Bloqueado"].apply(lambda b: "❌ BLOQUEADO - Requiere Reinducción" if b else "🟢 HABILITADO")
     
     st.table(df_historial[["Máquina", "Puntaje", "Estado Certificación", "Último Login Realizado", "Habilitación Planta"]])
 
@@ -184,37 +182,30 @@ elif menu == "📅 Armador de Turnos":
     
     col_area, col_turno = st.columns(2)
     with col_area:
-        area_t = st.selectbox("Seleccionar Área de Planta:", ["Famma Estampado", "Famma Soldadura"]) [cite: 81, 88]
+        area_t = st.selectbox("Seleccionar Área de Planta:", ["Famma Estampado", "Famma Soldadura"])
     with col_turno:
         turno_t = st.selectbox("Seleccionar Turno de Trabajo:", ["A (Mañana)", "B (Tarde)", "C (Noche)"])
     
-    puestos_del_area = puestos_estampado if area_t == "Famma Estampado" else puestos_soldadura [cite: 81, 88]
+    puestos_del_area = puestos_estampado if area_t == "Famma Estampado" else puestos_soldadura
     
     st.markdown(f"### 📋 Roster de Planta: {area_t} - Turno {turno_t}")
-    st.markdown("Asigne a los operarios idóneos en las celdas disponibles para configurar el panel visual[cite: 74].")
+    st.markdown("Asigne a los operarios idóneos en las celdas disponibles para configurar el panel visual.")
     
-    # Inicializar la clave del estado de la sesión si no existe para este turno y área
     key_turno_area = f"{area_t}_{turno_t}"
     if key_turno_area not in st.session_state.roster_planta:
         st.session_state.roster_planta[key_turno_area] = {p: "Sin Asignar" for p in puestos_del_area}
         
-    # Construcción de la grilla interactiva con celdas de asignación
     for puesto in puestos_del_area:
         st.markdown(f"#### ⚙️ Puesto: {puesto}")
         
-        # Filtrar candidatos posibles para esta máquina
         df_candidatos = df_base[df_base["Máquina"] == puesto]
-        
-        # Clasificamos operarios aptos y en reinducción para mostrarlos en el selector
         lista_aptos = df_candidatos[(df_candidatos["Nivel"] >= 3) & (~df_candidatos["Bloqueado"])]["Operario"].tolist()
         lista_reind = df_candidatos[(df_candidatos["Nivel"] >= 3) & (df_candidatos["Bloqueado"])]["Operario"].tolist()
         
-        # Opciones de asignación en el selectbox
         opciones_select = ["Sin Asignar"]
         opciones_select.extend([f"🟢 {op}" for op in lista_aptos])
-        opciones_select.extend([f"🟡 {op} (Exige Reinducción)" for op in lista_reind]) [cite: 74, 98]
+        opciones_select.extend([f"🟡 {op} (Exige Reinducción)" for op in lista_reind])
         
-        # Determinar el índice actual por si ya estaba guardado en memoria
         valor_guardado = st.session_state.roster_planta[key_turno_area].get(puesto, "Sin Asignar")
         idx_actual = 0
         for i, opc in enumerate(opciones_select):
@@ -222,7 +213,6 @@ elif menu == "📅 Armador de Turnos":
                 idx_actual = i
                 break
                 
-        # Celda de selección directa en la grilla
         seleccion = st.selectbox(
             f"Asignar operador para {puesto}:",
             options=opciones_select,
@@ -230,21 +220,17 @@ elif menu == "📅 Armador de Turnos":
             key=f"select_{key_turno_area}_{puesto}"
         )
         
-        # Guardamos la selección limpia (sin emojis de estado) en la memoria viva de la app
         st.session_state.roster_planta[key_turno_area][puesto] = seleccion.replace("🟢 ", "").replace("🟡 ", "")
         st.markdown("---")
         
-    # --- VISTAZO GENERAL DE PLANTA (RESUMEN EN TIEMPO REAL) ---
     st.markdown(f"### 👁️ Vistazo General de la Planta ({area_t})")
     
-    # Generamos la tabla resumen a partir del estado de la sesión
     datos_resumen = []
     for p, op in st.session_state.roster_planta[key_turno_area].items():
-        # Buscamos el estado técnico real del operador asignado para el aviso visual
         if op != "Sin Asignar":
             match = df_base[(df_base["Operario"] == op) & (df_base["Máquina"] == p)]
             if not match.empty and match["Bloqueado"].iloc[0]:
-                badge = '<span class="status-badge badge-reind">⚠️ REINDUCCIÓN PENDIENTE</span>' [cite: 74, 98]
+                badge = '<span class="status-badge badge-reind">⚠️ REINDUCCIÓN PENDIENTE</span>'
             else:
                 badge = '<span class="status-badge badge-apto">✅ OPERANDO</span>'
         else:
@@ -254,17 +240,15 @@ elif menu == "📅 Armador de Turnos":
         
     df_resumen = pd.DataFrame(datos_resumen)
     
-    # Renderizado HTML limpio del Tablero de Planta para gerencia
     html_tablero = df_resumen.to_html(escape=False, index=False)
     html_tablero = html_tablero.replace('<table border="1" class="dataframe">', '<table class="tablero-planta">')
     st.markdown(html_tablero, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Exportación del Roster del área completa para la semana 
     df_export_turno = df_resumen.copy()
-    df_export_turno["Estado Operativo"] = df_export_turno["Estado Operativo"].str.replace('<[^<]+?>', '', regex=True) # Limpia etiquetas HTML para Excel
+    df_export_turno["Estado Operativo"] = df_export_turno["Estado Operativo"].str.replace('<[^<]+?>', '', regex=True) 
     df_export_turno.insert(0, "Turno", turno_t)
-    df_export_turno.insert(0, "Área", area_t) [cite: 81, 88]
+    df_export_turno.insert(0, "Área", area_t)
     
     buffer_turno = io.BytesIO()
     with pd.ExcelWriter(buffer_turno, engine='openpyxl') as writer:
