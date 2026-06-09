@@ -14,11 +14,11 @@ menu = st.sidebar.radio(
     ["📊 Mapa Skill Global", "📝 Resumen Evaluaciones", "📅 Armador de Turnos"]
 )
 
-# --- FUNCIÓN GENERADORA DE CUADRANTES VISUALES (HTML) ---
+# --- FUNCIÓN GENERADORA DE CUADRANTES VISUALES (HTML CORREGIDO) ---
 def renderizar_cuadrantes(nivel, bloqueado=False):
-    """Genera el código HTML para mostrar los 4 cuadraditos estilo Fumiscor."""
+    """Genera el código HTML en una sola línea para evitar el error de los saltos \n"""
     if bloqueado:
-        return '<div style="color:#dc2626; font-weight:bold; text-align:center; padding: 5px;">🛑 BLOQ</div>'
+        return '<div style="color:#dc2626; font-weight:bold; text-align:center;">🛑</div>'
     
     # Lógica de colores por cuadrante (Negro si está completado, Blanco si no)
     c1 = "#000000" if nivel >= 1 else "#ffffff"
@@ -26,15 +26,8 @@ def renderizar_cuadrantes(nivel, bloqueado=False):
     c3 = "#000000" if nivel >= 3 else "#ffffff"
     c4 = "#000000" if nivel >= 4 else "#ffffff"
 
-    # Grilla HTML 2x2 simulando el Excel
-    return f'''
-    <div style="display:grid; grid-template-columns: 12px 12px; gap:1px; width:27px; margin:auto; background-color:#ccc; border: 1px solid #999;">
-        <div style="width:12px; height:12px; background-color:{c1};"></div>
-        <div style="width:12px; height:12px; background-color:{c2};"></div>
-        <div style="width:12px; height:12px; background-color:{c3};"></div>
-        <div style="width:12px; height:12px; background-color:{c4};"></div>
-    </div>
-    '''
+    # Grilla HTML 2x2 en una sola línea
+    return f'<div style="display:inline-grid; grid-template-columns:12px 12px; gap:1px; background-color:#ccc; border:1px solid #999; padding:1px; margin:auto;"><div style="width:12px; height:12px; background-color:{c1};"></div><div style="width:12px; height:12px; background-color:{c2};"></div><div style="width:12px; height:12px; background-color:{c3};"></div><div style="width:12px; height:12px; background-color:{c4};"></div></div>'
 
 # --- 3. PANTALLA: MAPA SKILL GLOBAL ---
 if menu == "📊 Mapa Skill Global":
@@ -77,22 +70,23 @@ if menu == "📊 Mapa Skill Global":
         else:
             return "BLOQUEADO" if bloqueado else f"Nivel {nivel}"
 
-    # Crear dos versiones: Una para ver, otra para descargar
     df_base["Visual_HTML"] = df_base.apply(lambda f: procesar_filas(f, True), axis=1)
     df_base["Export_Excel"] = df_base.apply(lambda f: procesar_filas(f, False), axis=1)
 
-    # Transformar a Grilla (Pivot)
     matriz_html = df_base.pivot(index="Operario", columns="Máquina", values="Visual_HTML").fillna('<div style="text-align:center; color:#ccc;">-</div>')
     matriz_excel = df_base.pivot(index="Operario", columns="Máquina", values="Export_Excel").fillna('Sin Datos')
 
-    # VISUALIZACIÓN EN PANTALLA (Inyectando HTML)
+    # VISUALIZACIÓN EN PANTALLA (Inyectando HTML sin escape y centrado)
     st.markdown("### Matriz de Polivalencia (Cuadrantes)")
-    st.markdown(
-        matriz_html.to_html(escape=False), 
-        unsafe_allow_html=True
-    )
     
-    st.markdown("<br>", unsafe_allow_html=True) # Espaciado
+    # Se centra el contenido de las celdas directamente en la tabla HTML
+    html_table = matriz_html.to_html(escape=False, justify='center')
+    html_table = html_table.replace('<th>', '<th style="text-align: center;">')
+    html_table = html_table.replace('<td>', '<td style="text-align: center; vertical-align: middle;">')
+    
+    st.markdown(html_table, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # EXPORTACIÓN NATIVA A EXCEL
     buffer = io.BytesIO()
