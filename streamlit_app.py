@@ -178,7 +178,7 @@ elif menu == "📝 Resumen Evaluaciones":
 # --- PANTALLA 3: ARMADOR DE TURNOS (TABLERO GENERAL DE PLANTA) ---
 elif menu == "📅 Armador de Turnos":
     st.title("📅 Tablero Maestro de Asignación por Área")
-    st.markdown("Asignación interactiva por puesto en celdas integradas de la planta.")
+    st.markdown("Asignación interactiva por puesto en celdas integradas de la planta. **Puede asignar múltiples operarios por celda.**")
     
     col_area, col_turno = st.columns(2)
     with col_area:
@@ -189,11 +189,13 @@ elif menu == "📅 Armador de Turnos":
     puestos_del_area = puestos_estampado if area_t == "Famma Estampado" else puestos_soldadura
     
     st.markdown(f"### 📋 Roster de Planta: {area_t} - Turno {turno_t}")
-    st.markdown("Asigne a los operarios idóneos en las celdas disponibles para configurar el panel visual.")
+    st.markdown("Seleccione todos los operarios necesarios para cada línea o celda (ej. 4 a 6 por Línea).")
     
     key_turno_area = f"{area_t}_{turno_t}"
+    
+    # Inicializamos la memoria guardando LISTAS vacías en lugar de "Sin Asignar"
     if key_turno_area not in st.session_state.roster_planta:
-        st.session_state.roster_planta[key_turno_area] = {p: "Sin Asignar" for p in puestos_del_area}
+        st.session_state.roster_planta[key_turno_area] = {p: [] for p in puestos_del_area}
         
     for puesto in puestos_del_area:
         st.markdown(f"#### ⚙️ Puesto: {puesto}")
@@ -202,41 +204,51 @@ elif menu == "📅 Armador de Turnos":
         lista_aptos = df_candidatos[(df_candidatos["Nivel"] >= 3) & (~df_candidatos["Bloqueado"])]["Operario"].tolist()
         lista_reind = df_candidatos[(df_candidatos["Nivel"] >= 3) & (df_candidatos["Bloqueado"])]["Operario"].tolist()
         
-        opciones_select = ["Sin Asignar"]
+        opciones_select = []
         opciones_select.extend([f"🟢 {op}" for op in lista_aptos])
         opciones_select.extend([f"🟡 {op} (Exige Reinducción)" for op in lista_reind])
         
-        valor_guardado = st.session_state.roster_planta[key_turno_area].get(puesto, "Sin Asignar")
-        idx_actual = 0
-        for i, opc in enumerate(opciones_select):
-            if valor_guardado in opc:
-                idx_actual = i
-                break
+        # Recuperamos la lista de operarios guardados y los mapeamos al formato visual del multiselect
+        valores_guardados = st.session_state.roster_planta[key_turno_area].get(puesto, [])
+        # Prevención de errores si había strings guardados de la versión anterior del código
+        if isinstance(valores_guardados, str): valores_guardados = [] 
+        
+        opciones_por_defecto = []
+        for opc in opciones_select:
+            nombre_limpio = opc.replace("🟢 ", "").replace("🟡 ", "").replace(" (Exige Reinducción)", "")
+            if nombre_limpio in valores_guardados:
+                opciones_por_defecto.append(opc)
                 
-        seleccion = st.selectbox(
-            f"Asignar operador para {puesto}:",
+        # Cambiamos selectbox por MULTISELECT
+        selecciones = st.multiselect(
+            f"Asignar equipo para {puesto}:",
             options=opciones_select,
-            index=idx_actual,
+            default=opciones_por_defecto,
             key=f"select_{key_turno_area}_{puesto}"
         )
         
-        st.session_state.roster_planta[key_turno_area][puesto] = seleccion.replace("🟢 ", "").replace("🟡 ", "")
+        # Limpiamos los emojis/textos extra y guardamos la lista pura en memoria
+        nombres_limpios = [s.replace("🟢 ", "").replace("🟡 ", "").replace(" (Exige Reinducción)", "") for s in selecciones]
+        st.session_state.roster_planta[key_turno_area][puesto] = nombres_limpios
         st.markdown("---")
         
     st.markdown(f"### 👁️ Vistazo General de la Planta ({area_t})")
     
     datos_resumen = []
-    for p, op in st.session_state.roster_planta[key_turno_area].items():
-        if op != "Sin Asignar":
-            match = df_base[(df_base["Operario"] == op) & (df_base["Máquina"] == p)]
-            if not match.empty and match["Bloqueado"].iloc[0]:
-                badge = '<span class="status-badge badge-reind">⚠️ REINDUCCIÓN PENDIENTE</span>'
-            else:
-                badge = '<span class="status-badge badge-apto">✅ OPERANDO</span>'
-        else:
+    for p, lista_ops in st.session_state.roster_planta[key_turno_area].items():
+        if not lista_ops:  # Si la lista está vacía
             badge = '<span style="color:#94a3b8; font-style:italic;">Celda Vacía</span>'
-            
-        datos_resumen.append({"Puesto / Celda": p, "Operario Asignado": op, "Estado Operativo": badge})
+            datos_resumen.append({"Puesto / Celda": p, "Operario Asignado": "-", "Estado Operativo": badge})
+        else:
+            # Si hay operarios, creamos una fila por cada uno
+            for op in lista_ops:
+                match = df_base[(df_base["Operario"] == op) & (df_base["Máquina"] == p)]
+                if not match.empty and match["Bloqueado"].iloc[0]:
+                    badge = '<span class="status-badge badge-reind">⚠️ REINDUCCIÓN PENDIENTE</span>'
+                else:
+                    badge = '<span class="status-badge badge-apto">✅ OPERANDO</span>'
+                    
+                datos_resumen.append({"Puesto / Celda": p, "Operario Asignado": op, "Estado Operativo": badge})
         
     df_resumen = pd.DataFrame(datos_resumen)
     
@@ -245,6 +257,7 @@ elif menu == "📅 Armador de Turnos":
     st.markdown(html_tablero, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
+    # Exportación a Excel conservando la nueva estructura de múltiples filas
     df_export_turno = df_resumen.copy()
     df_export_turno["Estado Operativo"] = df_export_turno["Estado Operativo"].str.replace('<[^<]+?>', '', regex=True) 
     df_export_turno.insert(0, "Turno", turno_t)
