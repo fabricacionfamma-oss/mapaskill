@@ -3,125 +3,164 @@ import pandas as pd
 from datetime import datetime, timedelta
 import io
 
-# --- 1. CONFIGURACIÓN DE LA PÁGINA ---
+# --- 1. CONFIGURACIÓN DE LA PÁGINA Y CSS INDUSTRIAL ---
 st.set_page_config(page_title="Gestor FUMISCOR", layout="wide", page_icon="🏭")
 
-# --- 2. BARRA LATERAL (NAVEGACIÓN) ---
-st.sidebar.title("⚙️ FUMISCOR")
+st.markdown("""
+<style>
+    /* Estilos de la Grilla (Mapa Skill) */
+    .grilla-fumiscor { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', sans-serif; font-size: 15px; margin-top: 15px; }
+    .grilla-fumiscor th { background-color: #0f172a; color: #ffffff; font-weight: 700; padding: 14px; text-align: center; border: 2px solid #334155; }
+    .grilla-fumiscor td { padding: 12px; text-align: center; vertical-align: middle; border: 2px solid #cbd5e1; }
+    .grilla-fumiscor td:first-child { font-weight: bold; color: #0f172a; background-color: #f1f5f9; text-align: left; padding-left: 15px; border-right: 3px solid #64748b; width: 250px; }
+    .grilla-fumiscor tr:hover { background-color: #f8fafc; }
+    
+    /* Contenedores del Turnero */
+    .box-turno { padding: 15px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #cbd5e1; }
+    .box-apto { background-color: #f0fdf4; border-left: 5px solid #16a34a; }
+    .box-reind { background-color: #fffbeb; border-left: 5px solid #d97706; }
+    .box-noapto { background-color: #fef2f2; border-left: 5px solid #dc2626; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- 2. BASE DE DATOS UNIFICADA (Simulación de Forms + Wiidem) ---
+hoy = datetime.now()
+datos_fabrica = [
+    {"Legajo": "1001", "Operario": "Juan Pérez", "Máquina": "Línea 2", "Puntaje": 25, "Ultimo_Logueo": hoy - timedelta(days=5)},
+    {"Legajo": "1001", "Operario": "Juan Pérez", "Máquina": "Línea 3", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=72)}, # Bloqueado
+    {"Legajo": "1001", "Operario": "Juan Pérez", "Máquina": "Línea 4", "Puntaje": 60, "Ultimo_Logueo": hoy - timedelta(days=10)},
+    {"Legajo": "1002", "Operario": "Ana Gómez", "Máquina": "Línea 2", "Puntaje": 55, "Ultimo_Logueo": hoy - timedelta(days=12)},
+    {"Legajo": "1002", "Operario": "Ana Gómez", "Máquina": "Línea 4", "Puntaje": 90, "Ultimo_Logueo": hoy - timedelta(days=2)},
+    {"Legajo": "1002", "Operario": "Ana Gómez", "Máquina": "MIG", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=4)},
+    {"Legajo": "1003", "Operario": "Carlos Ruiz", "Máquina": "Línea 3", "Puntaje": 20, "Ultimo_Logueo": hoy - timedelta(days=1)},
+    {"Legajo": "1003", "Operario": "Carlos Ruiz", "Máquina": "PRP", "Puntaje": 40, "Ultimo_Logueo": hoy - timedelta(days=80)}, # Bloqueado
+    {"Legajo": "1004", "Operario": "María López", "Máquina": "Celdas Robot", "Puntaje": 95, "Ultimo_Logueo": hoy - timedelta(days=3)},
+    {"Legajo": "1004", "Operario": "María López", "Máquina": "MIG", "Puntaje": 75, "Ultimo_Logueo": hoy - timedelta(days=8)},
+    {"Legajo": "1005", "Operario": "Diego Torres", "Máquina": "PRP", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=65)}, # Bloqueado
+    {"Legajo": "1005", "Operario": "Diego Torres", "Máquina": "Celdas Robot", "Puntaje": 15, "Ultimo_Logueo": hoy - timedelta(days=2)},
+    {"Legajo": "1006", "Operario": "Gabriel Méndez", "Máquina": "Línea 2", "Puntaje": 80, "Ultimo_Logueo": hoy - timedelta(days=4)},
+    {"Legajo": "1007", "Operario": "Sofia Rodríguez", "Máquina": "Celdas Robot", "Puntaje": 85, "Ultimo_Logueo": hoy - timedelta(days=1)},
+    {"Legajo": "1008", "Operario": "Cristian Ortega", "Máquina": "Línea 4", "Puntaje": 70, "Ultimo_Logueo": hoy - timedelta(days=6)},
+    {"Legajo": "1009", "Operario": "Valeria Russo", "Máquina": "PRP", "Puntaje": 80, "Ultimo_Logueo": hoy - timedelta(days=2)},
+    {"Legajo": "1010", "Operario": "Lucas Herrera", "Máquina": "Línea 2", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=90)} # Bloqueado
+]
+df_base = pd.DataFrame(datos_fabrica)
+
+# --- 3. LÓGICA DE NEGOCIO (Motor FUMISCOR) ---
+def analizar_competencia(fila):
+    dias_inactivo = (hoy - fila["Ultimo_Logueo"]).days
+    puntaje = fila["Puntaje"]
+    
+    if puntaje <= 25: nivel = 1
+    elif puntaje <= 50: nivel = 2
+    elif puntaje <= 75: nivel = 3
+    else: nivel = 4
+    
+    bloqueado = dias_inactivo > 60
+    return nivel, bloqueado, dias_inactivo
+
+df_base[['Nivel', 'Bloqueado', 'Dias_Inactivo']] = df_base.apply(lambda r: pd.Series(analizar_competencia(r)), axis=1)
+puestos_ordenados = ["Línea 2", "Línea 3", "Línea 4", "Celdas Robot", "MIG", "PRP"]
+
+# --- 4. BARRA LATERAL Y EXPORTACIÓN MAESTRA ---
+st.sidebar.title("⚙️ PANEL FUMISCOR")
 st.sidebar.markdown("---")
-menu = st.sidebar.radio(
-    "Navegación del Sistema",
-    ["📊 Mapa Skill Global", "📝 Resumen Evaluaciones", "📅 Armador de Turnos"]
-)
+menu = st.sidebar.radio("Navegación", ["📊 Mapa Skill Global", "📝 Resumen Evaluaciones", "📅 Armador de Turnos"])
 
-# --- FUNCIÓN GENERADORA DE CUADRANTES VISUALES (HTML CORREGIDO) ---
-def renderizar_cuadrantes(nivel, bloqueado=False):
-    """Genera el código HTML en una sola línea para evitar el error de los saltos \n"""
-    if bloqueado:
-        return '<div style="color:#dc2626; font-weight:bold; text-align:center;">🛑</div>'
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📥 Sincronización Excel")
+
+def generar_excel_master():
+    """Genera el Excel exacto para copiar y pegar en la matriz 'Plan de Entrenamiento'"""
+    df_export = df_base[["Máquina", "Legajo", "Operario", "Puntaje", "Ultimo_Logueo"]].copy()
+    df_export.columns = ["PUESTO DE TRABAJO", "LEGAJO", "APELLIDO Y NOMBRE", "EVALUACIÓN TEÓRICO PRÁCTICA", "FECHA EVALUACIÓN"]
+    df_export["FECHA EVALUACIÓN"] = df_export["FECHA EVALUACIÓN"].dt.strftime('%d/%m/%Y')
     
-    # Lógica de colores por cuadrante (Negro si está completado, Blanco si no)
-    c1 = "#000000" if nivel >= 1 else "#ffffff"
-    c2 = "#000000" if nivel >= 2 else "#ffffff"
-    c3 = "#000000" if nivel >= 3 else "#ffffff"
-    c4 = "#000000" if nivel >= 4 else "#ffffff"
-
-    # Grilla HTML 2x2 en una sola línea
-    return f'<div style="display:inline-grid; grid-template-columns:12px 12px; gap:1px; background-color:#ccc; border:1px solid #999; padding:1px; margin:auto;"><div style="width:12px; height:12px; background-color:{c1};"></div><div style="width:12px; height:12px; background-color:{c2};"></div><div style="width:12px; height:12px; background-color:{c3};"></div><div style="width:12px; height:12px; background-color:{c4};"></div></div>'
-
-# --- 3. PANTALLA: MAPA SKILL GLOBAL ---
-if menu == "📊 Mapa Skill Global":
-    st.title("📊 Mapa Skill General")
-    st.markdown("Visualización de cuadrantes (Progresión del nivel 1 al 4).")
-    
-    # SIMULACIÓN DE DATOS (Famma Estampado y Soldadura)
-    hoy = datetime.now()
-    datos_prueba = [
-        {"Operario": "Juan Pérez", "Máquina": "Línea 2", "Puntaje": 25, "Ultimo_Logueo": hoy - timedelta(days=5)}, # Nivel 1
-        {"Operario": "Juan Pérez", "Máquina": "Línea 3", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=70)}, # Bloqueado
-        {"Operario": "Ana Gómez", "Máquina": "Línea 2", "Puntaje": 50, "Ultimo_Logueo": hoy - timedelta(days=12)}, # Nivel 2
-        {"Operario": "Ana Gómez", "Máquina": "Línea 4", "Puntaje": 75, "Ultimo_Logueo": hoy - timedelta(days=2)},  # Nivel 3
-        {"Operario": "Carlos Ruiz", "Máquina": "Línea 3", "Puntaje": 20, "Ultimo_Logueo": hoy - timedelta(days=1)},  # Nivel 1
-        {"Operario": "Carlos Ruiz", "Máquina": "Línea 4", "Puntaje": 95, "Ultimo_Logueo": hoy - timedelta(days=15)}, # Nivel 4
-        
-        {"Operario": "María López", "Máquina": "Celdas Robot", "Puntaje": 90, "Ultimo_Logueo": hoy - timedelta(days=10)},# Nivel 4
-        {"Operario": "María López", "Máquina": "MIG", "Puntaje": 60, "Ultimo_Logueo": hoy - timedelta(days=5)},     # Nivel 3
-        {"Operario": "Diego Torres", "Máquina": "PRP", "Puntaje": 100, "Ultimo_Logueo": hoy - timedelta(days=80)},   # Bloqueado
-        {"Operario": "Laura Silva", "Máquina": "MIG", "Puntaje": 40, "Ultimo_Logueo": hoy - timedelta(days=20)}      # Nivel 2
-    ]
-    
-    df_base = pd.DataFrame(datos_prueba)
-
-    # LÓGICA DE NEGOCIO: Separar datos para Excel vs datos para Visualización
-    def procesar_filas(fila, formato_html=True):
-        dias_inactivo = (hoy - fila["Ultimo_Logueo"]).days
-        puntaje = fila["Puntaje"]
-        
-        # Determinar el Nivel (1 al 4)
-        if puntaje <= 25: nivel = 1
-        elif puntaje <= 50: nivel = 2
-        elif puntaje <= 75: nivel = 3
-        else: nivel = 4
-        
-        bloqueado = dias_inactivo > 60
-        
-        if formato_html:
-            return renderizar_cuadrantes(nivel, bloqueado)
-        else:
-            return "BLOQUEADO" if bloqueado else f"Nivel {nivel}"
-
-    df_base["Visual_HTML"] = df_base.apply(lambda f: procesar_filas(f, True), axis=1)
-    df_base["Export_Excel"] = df_base.apply(lambda f: procesar_filas(f, False), axis=1)
-
-    matriz_html = df_base.pivot(index="Operario", columns="Máquina", values="Visual_HTML").fillna('<div style="text-align:center; color:#ccc;">-</div>')
-    matriz_excel = df_base.pivot(index="Operario", columns="Máquina", values="Export_Excel").fillna('Sin Datos')
-
-    # VISUALIZACIÓN EN PANTALLA (Inyectando HTML sin escape y centrado)
-    st.markdown("### Matriz de Polivalencia (Cuadrantes)")
-    
-    # Se centra el contenido de las celdas directamente en la tabla HTML
-    html_table = matriz_html.to_html(escape=False, justify='center')
-    html_table = html_table.replace('<th>', '<th style="text-align: center;">')
-    html_table = html_table.replace('<td>', '<td style="text-align: center; vertical-align: middle;">')
-    
-    st.markdown(html_table, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # EXPORTACIÓN NATIVA A EXCEL
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        matriz_excel.to_excel(writer, sheet_name='Mapa Skill')
-    
-    st.download_button(
-        label="📥 Exportar Grilla Limpia a Excel (.xlsx)",
-        data=buffer.getvalue(),
-        file_name='Mapa_Skill_Fumiscor.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+        df_export.to_excel(writer, sheet_name='PLAN ENTRENAMIENTO', index=False)
+        ws = writer.sheets['PLAN ENTRENAMIENTO']
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 30
+        ws.column_dimensions['D'].width = 35
+        ws.column_dimensions['E'].width = 20
+    return buffer.getvalue()
 
-# --- 4. PANTALLA: RESUMEN EVALUACIONES ---
+st.sidebar.download_button(
+    label="📄 Descargar 'Plan de Entrenamiento'",
+    data=generar_excel_master(),
+    file_name='Sincronizador_Plan_Entrenamiento.xlsx',
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    help="Descarga el formato exacto de 5 columnas para pegar en tu Excel original."
+)
+
+# --- PANTALLA 1: MAPA SKILL GLOBAL ---
+if menu == "📊 Mapa Skill Global":
+    st.title("📊 Mapa Skill General")
+    st.markdown("Visualización de cuadrantes ampliados (18x18px) para seguimiento en Planta.")
+    
+    def renderizar_html_grid(nivel, bloqueado):
+        if bloqueado: return '<div style="color:#ef4444; font-weight:bold; font-size:22px; text-align:center;">🔒</div>'
+        c1, c2, c3, c4 = ["#000000" if nivel >= i else "#ffffff" for i in range(1, 5)]
+        return f'<div style="display:inline-grid; grid-template-columns:18px 18px; gap:2px; background-color:#000000; border:2px solid #000000; padding:2px; margin:auto;"><div style="width:18px; height:18px; background-color:{c1};"></div><div style="width:18px; height:18px; background-color:{c2};"></div><div style="width:18px; height:18px; background-color:{c3};"></div><div style="width:18px; height:18px; background-color:{c4};"></div></div>'
+
+    df_base["HTML_Grid"] = df_base.apply(lambda f: renderizar_html_grid(f["Nivel"], f["Bloqueado"]), axis=1)
+    
+    matriz_html = df_base.pivot(index="Operario", columns="Máquina", values="HTML_Grid").fillna('<div style="color:#cbd5e1;">-</div>')
+    matriz_html = matriz_html[[p for p in puestos_ordenados if p in matriz_html.columns]]
+    
+    html_final = matriz_html.to_html(escape=False).replace('<table border="1" class="dataframe">', '<table class="grilla-fumiscor">').replace('<th>Operario</th>', '<th>Colaboradores / Puestos</th>')
+    st.markdown(html_final, unsafe_allow_html=True)
+
+# --- PANTALLA 2: RESUMEN EVALUACIONES ---
 elif menu == "📝 Resumen Evaluaciones":
-    st.title("📝 Resumen de Evaluaciones por Usuario")
-    operario_buscado = st.selectbox("Seleccione un Operario:", ["Juan Pérez", "Ana Gómez", "Carlos Ruiz", "María López", "Diego Torres", "Laura Silva"])
+    st.title("📝 Legajo Técnico del Colaborador")
+    op_seleccionado = st.selectbox("Seleccione el Colaborador:", df_base["Operario"].unique())
+    df_op = df_base[df_base["Operario"] == op_seleccionado]
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Última Evaluación", value="Línea 2", delta="Nivel 3 (75%)")
-    with col2:
-        st.metric(label="Estado de Actividad", value="Activo", delta="Último logueo: Hace 5 días")
+    st.markdown(f"### **Colaborador:** {op_seleccionado} | **Legajo:** {df_op['Legajo'].iloc[0]}")
+    
+    kpi1, kpi2 = st.columns(2)
+    kpi1.metric("Puestos Autónomos/Expertos (>= N3)", len(df_op[df_op["Nivel"] >= 3]))
+    kpi2.metric("Puestos Bloqueados (>60 días inactivo)", len(df_op[df_op["Bloqueado"] == True]))
+    
+    st.markdown("#### Historial de Certificaciones (Forms + Wiidem)")
+    df_historial = df_op.copy()
+    df_historial["Estado"] = df_historial.apply(lambda r: "🛑 BLOQUEADO" if r["Bloqueado"] else ("⭐ Experto" if r["Nivel"] == 4 else ("✅ Autónomo" if r["Nivel"] == 3 else ("⚠️ Básico" if r["Nivel"] == 2 else "🌱 Entrenamiento"))), axis=1)
+    df_historial["Último logueo"] = df_historial["Dias_Inactivo"].apply(lambda d: f"Hace {d} días")
+    st.table(df_historial[["Máquina", "Puntaje", "Estado", "Último logueo"]])
 
-# --- 5. PANTALLA: ARMADOR DE TURNOS ---
+# --- PANTALLA 3: ARMADOR DE TURNOS ---
 elif menu == "📅 Armador de Turnos":
-    st.title("📅 Armador de Turnos Seguro")
-    st.warning("El sistema cruza el Nivel del Mapa Skill con el último logueo de Wiidem.")
+    st.title("📅 Armador Seguro de Turnos")
     
-    col_maq, col_turno = st.columns(2)
-    with col_maq:
-        maquina = st.selectbox("Seleccionar Puesto:", ["Línea 2", "Línea 3", "Línea 4", "Celdas Robot", "MIG", "PRP"])
-    with col_turno:
-        turno = st.selectbox("Seleccionar Turno:", ["A (Mañana)", "B (Tarde)", "C (Noche)"]) 
+    col_p, col_t = st.columns(2)
+    with col_p: puesto_t = st.selectbox("Seleccionar Puesto:", puestos_ordenados)
+    with col_t: turno_t = st.selectbox("Seleccionar Turno:", ["A (Mañana)", "B (Tarde)", "C (Noche)"])
         
-    st.success(f"Operarios Calificados para {maquina} en Turno {turno}:")
-    st.checkbox("María López (Nivel 4: Experto)")
-    st.checkbox("Ana Gómez (Nivel 3: Autónomo)")
+    st.markdown(f"### Dotación para **{puesto_t}** en **Turno {turno_t}**")
+    df_puesto = df_base[df_base["Máquina"] == puesto_t]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("#### 🟢 Aptos Inmediatos")
+        aptos = df_puesto[(df_puesto["Nivel"] >= 3) & (~df_puesto["Bloqueado"])]
+        if not aptos.empty:
+            for _, row in aptos.iterrows():
+                st.checkbox(f"{row['Operario']} (N{row['Nivel']})", key=f"apto_{row['Operario']}")
+                st.markdown(f'<div class="box-turno box-apto"><b>{row["Operario"]}</b><br>Listo para operar.</div>', unsafe_allow_html=True)
+        else: st.info("No hay personal activo.")
+            
+    with col2:
+        st.markdown("#### 🟡 Reinducción Requerida")
+        reind = df_puesto[(df_puesto["Nivel"] >= 3) & (df_puesto["Bloqueado"])]
+        for _, row in reind.iterrows():
+            st.markdown(f'<div class="box-turno box-reind"><b>{row["Operario"]}</b><br>⚠️ Exige checklist.</div>', unsafe_allow_html=True)
+            
+    with col3:
+        st.markdown("#### 🔴 No Aptos")
+        no_aptos = df_puesto[df_puesto["Nivel"] < 3]
+        for _, row in no_aptos.iterrows():
+            st.markdown(f'<div class="box-turno box-noapto"><b>{row["Operario"]}</b><br>En entrenamiento.</div>', unsafe_allow_html=True)
