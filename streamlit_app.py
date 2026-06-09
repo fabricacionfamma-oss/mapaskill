@@ -189,11 +189,10 @@ elif menu == "📅 Armador de Turnos":
     puestos_del_area = puestos_estampado if area_t == "Famma Estampado" else puestos_soldadura
     
     st.markdown(f"### 📋 Roster de Planta: {area_t} - Turno {turno_t}")
-    st.markdown("Seleccione todos los operarios necesarios para cada línea o celda (ej. 4 a 6 por Línea).")
+    st.markdown("Seleccione todos los operarios necesarios para cada línea o celda.")
     
     key_turno_area = f"{area_t}_{turno_t}"
     
-    # Inicializamos la memoria guardando LISTAS vacías en lugar de "Sin Asignar"
     if key_turno_area not in st.session_state.roster_planta:
         st.session_state.roster_planta[key_turno_area] = {p: [] for p in puestos_del_area}
         
@@ -208,9 +207,7 @@ elif menu == "📅 Armador de Turnos":
         opciones_select.extend([f"🟢 {op}" for op in lista_aptos])
         opciones_select.extend([f"🟡 {op} (Exige Reinducción)" for op in lista_reind])
         
-        # Recuperamos la lista de operarios guardados y los mapeamos al formato visual del multiselect
         valores_guardados = st.session_state.roster_planta[key_turno_area].get(puesto, [])
-        # Prevención de errores si había strings guardados de la versión anterior del código
         if isinstance(valores_guardados, str): valores_guardados = [] 
         
         opciones_por_defecto = []
@@ -219,7 +216,6 @@ elif menu == "📅 Armador de Turnos":
             if nombre_limpio in valores_guardados:
                 opciones_por_defecto.append(opc)
                 
-        # Cambiamos selectbox por MULTISELECT
         selecciones = st.multiselect(
             f"Asignar equipo para {puesto}:",
             options=opciones_select,
@@ -227,48 +223,60 @@ elif menu == "📅 Armador de Turnos":
             key=f"select_{key_turno_area}_{puesto}"
         )
         
-        # Limpiamos los emojis/textos extra y guardamos la lista pura en memoria
         nombres_limpios = [s.replace("🟢 ", "").replace("🟡 ", "").replace(" (Exige Reinducción)", "") for s in selecciones]
         st.session_state.roster_planta[key_turno_area][puesto] = nombres_limpios
         st.markdown("---")
         
     st.markdown(f"### 👁️ Vistazo General de la Planta ({area_t})")
     
-    datos_resumen = []
+    # --- SISTEMA DE ALERTA DE DUPLICADOS ---
+    todos_los_asignados = []
+    for ops in st.session_state.roster_planta[key_turno_area].values():
+        todos_los_asignados.extend(ops)
+        
+    import collections
+    duplicados = [op for op, count in collections.Counter(todos_los_asignados).items() if count > 1]
+    
+    if duplicados:
+        st.error(f"⚠️ **ALERTA DE SOLAPAMIENTO:** Los siguientes operarios están asignados a múltiples puestos al mismo tiempo: **{', '.join(duplicados)}**")
+    
+    # --- CONSTRUCCIÓN DEL TABLERO COLUMNAR ---
+    dict_columnas = {}
     for p, lista_ops in st.session_state.roster_planta[key_turno_area].items():
-        if not lista_ops:  # Si la lista está vacía
-            badge = '<span style="color:#94a3b8; font-style:italic;">Celda Vacía</span>'
-            datos_resumen.append({"Puesto / Celda": p, "Operario Asignado": "-", "Estado Operativo": badge})
+        operarios_formateados = []
+        if not lista_ops:
+            operarios_formateados.append('<span style="color:#94a3b8; font-style:italic;">- Vacío -</span>')
         else:
-            # Si hay operarios, creamos una fila por cada uno
             for op in lista_ops:
                 match = df_base[(df_base["Operario"] == op) & (df_base["Máquina"] == p)]
                 if not match.empty and match["Bloqueado"].iloc[0]:
-                    badge = '<span class="status-badge badge-reind">⚠️ REINDUCCIÓN PENDIENTE</span>'
+                    operarios_formateados.append(f'⚠️ {op} <span style="color:#ef4444; font-size:11px;">(Reinducción)</span>')
                 else:
-                    badge = '<span class="status-badge badge-apto">✅ OPERANDO</span>'
+                    operarios_formateados.append(f'✅ {op}')
                     
-                datos_resumen.append({"Puesto / Celda": p, "Operario Asignado": op, "Estado Operativo": badge})
+        # Usamos pd.Series para permitir columnas de diferentes longitudes sin error
+        dict_columnas[p] = pd.Series(operarios_formateados)
         
-    df_resumen = pd.DataFrame(datos_resumen)
+    # Llenamos los espacios vacíos generados por la diferencia de longitudes con strings vacíos
+    df_resumen_columnas = pd.DataFrame(dict_columnas).fillna("")
     
-    html_tablero = df_resumen.to_html(escape=False, index=False)
-    html_tablero = html_tablero.replace('<table border="1" class="dataframe">', '<table class="tablero-planta">')
+    html_tablero = df_resumen_columnas.to_html(escape=False, index=False)
+    html_tablero = html_tablero.replace('<table border="1" class="dataframe">', '<table class="tablero-planta" style="text-align: center;">')
     st.markdown(html_tablero, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Exportación a Excel conservando la nueva estructura de múltiples filas
-    df_export_turno = df_resumen.copy()
-    df_export_turno["Estado Operativo"] = df_export_turno["Estado Operativo"].str.replace('<[^<]+?>', '', regex=True) 
-    df_export_turno.insert(0, "Turno", turno_t)
-    df_export_turno.insert(0, "Área", area_t)
+    # --- EXPORTACIÓN A EXCEL ADAPTADA AL NUEVO FORMATO ---
+    df_export_turno = df_resumen_columnas.copy()
+    # Limpiamos las etiquetas HTML para el Excel
+    for col in df_export_turno.columns:
+        df_export_turno[col] = df_export_turno[col].str.replace('<[^<]+?>', '', regex=True)
     
     buffer_turno = io.BytesIO()
     with pd.ExcelWriter(buffer_turno, engine='openpyxl') as writer:
-        df_export_turno.to_excel(writer, sheet_name='Roster Planta', index=False)
+        df_export_turno.to_excel(writer, sheet_name=f'Turno {turno_t}', index=False)
         
     st.download_button(
-        label=f"📥 Exportar Vistazo General de {area_t} a Excel",
+        label=f"📥 Exportar Roster Columnar a Excel",
         data=buffer_turno.getvalue(),
         file_name=f"Roster_{area_t.replace(' ', '_')}_{turno_t}.xlsx",
         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
